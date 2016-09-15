@@ -7,19 +7,23 @@ public class SerialSample : MonoBehaviour {
 
 	// Use this for initialization
 	void Start () {
+		string[] names = SerialHandler.getPortNames ();
+		for (int i = 0; i < names.Length; i++) {
+			Debug.Log (names[i]);
+		}
+
 		serial.OnDataReceived += Serial_OnDataReceived;
 	}
 
 	void Serial_OnDataReceived (string message)
 	{
-		
+		Debug.Log ("message: "+message);
 	}
 
 	// Update is called once per frame
-	void Update () {
+	void Update() {
 
 	}
-
 
 	public string str;
 	void OnGUI()
@@ -30,5 +34,14 @@ public class SerialSample : MonoBehaviour {
 			serial.Write(str+"\r");
 		}
 		GUILayout.EndArea();
+
+		// inputTest
+		Event e = Event.current;
+
+		if (Input.anyKeyDown && e.isKey && e.keyCode != KeyCode.None) {
+			Debug.Log ("Detected key code: " + e.keyCode);
+			serial.Write (e.keyCode + "\n");
+		}
+
 	}
 }

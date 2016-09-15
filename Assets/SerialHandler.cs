@@ -9,21 +9,6 @@ using Microsoft.Win32;
 
 public class SerialHandler : MonoBehaviour
 {
-	public delegate void SerialDataReceivedEventHandler(string message);
-	public event SerialDataReceivedEventHandler OnDataReceived;
-	
-	public string portName = "/dev/cu.usbmodem1421";
-	public int baudRate    = 115200;
-	
-	private SerialPort serialPort_;
-	private Thread thread_;
-	private bool isRunning_ = false;
-	
-	private string message_;
-	private bool isNewMessageReceived_ = false;
-
-	public bool enableRead = false;
-
 	// http://answers.unity3d.com/questions/643078/serialportsgetportnames-error.html
 	// https://github.com/mono/mono/blob/master/mcs/class/System/System.IO.Ports/SerialPort.cs
 	public static string[] getPortNames ()
@@ -55,6 +40,25 @@ public class SerialHandler : MonoBehaviour
 		return serial_ports.ToArray ();
 	}
 
+	public delegate void SerialDataReceivedEventHandler(string message);
+	public event SerialDataReceivedEventHandler OnDataReceived;
+	
+	public string portName = "/dev/cu.usbmodem1421";
+	public int baudRate    = 115200;
+	
+	private SerialPort serialPort_;
+	private Thread thread_;
+	private bool isRunning_ = false;
+	
+//	private string message_;
+//	private bool isNewMessageReceived_ = false;
+
+	public bool enableRead = false;
+
+	private Queue messageQueue;
+
+	public int maxUnreadMessages = 1;
+
 	void Start()
 	{
 		Open();
@@ -62,9 +66,21 @@ public class SerialHandler : MonoBehaviour
 	
 	void Update()
 	{
-		if (isNewMessageReceived_) {
-			OnDataReceived(message_);
-			isNewMessageReceived_ = false;
+//		if (isNewMessageReceived_) {
+//			OnDataReceived(message_);
+//			isNewMessageReceived_ = false;
+//		}
+
+		if(messageQueue != null){
+			lock(messageQueue.SyncRoot){
+				if(messageQueue.Count > 0){
+
+					if(OnDataReceived != null){
+						string msg = messageQueue.Dequeue().ToString();
+						OnDataReceived( msg );
+					}
+				}
+			}
 		}
 	}
 	
@@ -79,6 +95,8 @@ public class SerialHandler : MonoBehaviour
 
 		serialPort_.ReadTimeout = 20; // win
 		serialPort_.NewLine = "\r";// win
+
+		messageQueue = Queue.Synchronized(new Queue());
 
 		try{
 			serialPort_.Open();
@@ -108,42 +126,46 @@ public class SerialHandler : MonoBehaviour
 			serialPort_.Dispose();
 			serialPort_ = null;
 		}
+
+		if(messageQueue != null){
+			messageQueue = null;
+		}
 	}
 	
 	private void Read()
 	{
 		while (isRunning_ && serialPort_ != null && serialPort_.IsOpen) {
 			// mac
-			if (Application.platform == RuntimePlatform.OSXEditor || Application.platform == RuntimePlatform.OSXPlayer) {
-				try {
-					if (serialPort_.BytesToRead > 0) {
-//					message_ = serialPort_.ReadLine();
-						message_ = serialPort_.ReadExisting ();
-						Debug.Log (">> OSX message: " + message_);
-						isNewMessageReceived_ = true;
-					} else {
-						Thread.Sleep (20);
-					}
-				} catch (System.Exception e) {
-					Debug.LogWarning (e.Message);
-				}
-			}
+//			if (Application.platform == RuntimePlatform.OSXEditor || Application.platform == RuntimePlatform.OSXPlayer) {
+//				try {
+//					if (serialPort_.BytesToRead > 0) {
+////					message_ = serialPort_.ReadLine();
+//						message_ = serialPort_.ReadExisting ();
+//						Debug.Log (">> OSX message: " + message_);
+//						isNewMessageReceived_ = true;
+//					} else {
+//						Thread.Sleep (20);
+//					}
+//				} catch (System.Exception e) {
+//					Debug.LogWarning (e.Message);
+//				}
+//			}
 
 			// win
-			if (Application.platform == RuntimePlatform.WindowsEditor || Application.platform == RuntimePlatform.WindowsPlayer) {
+//			if (Application.platform == RuntimePlatform.WindowsEditor || Application.platform == RuntimePlatform.WindowsPlayer) {
 				try {
-					// message = serialPort_.ReadTo("\r");
+//					string message = serialPort_.ReadTo("\r");
 					string message = serialPort_.ReadLine ();
-					if (message != "") {;
-						message_ = message;
-						Debug.Log (">> Win message: " + message);
-						isNewMessageReceived_ = true;
+					if (message != null && message != "") {
+						if(messageQueue.Count < maxUnreadMessages){
+							messageQueue.Enqueue( message );
+						}
 					}
 //				} catch (System.Exception e) {
 				} catch {
-					Thread.Sleep (20);
+//					Thread.Sleep (20);
 				}
-			}
+//			}
 		}
 	}
 	
