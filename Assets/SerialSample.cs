@@ -42,6 +42,5 @@ public class SerialSample : MonoBehaviour {
 			Debug.Log ("Detected key code: " + e.keyCode);
 			serial.Write (e.keyCode + "\n");
 		}
-
 	}
 }
